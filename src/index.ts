@@ -5,8 +5,8 @@ import {Server} from "http"
 import app from "./app"
 
 dotenv.config(); 
-console.log("DB Name:", process.env.dbName);
-console.log("DB Pass:", process.env.dbPass);
+// console.log("DB Name:", process.env.dbName);
+// console.log("DB Pass:", process.env.dbPass);
 
 let server: Server;
 const PORT=4000;

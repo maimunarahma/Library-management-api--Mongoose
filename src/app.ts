@@ -1,6 +1,6 @@
 
 
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Express, Request, Response} from 'express';
 import { Book } from './models/books.model';
 import { Borrow } from './models/borrow.model';
 const app: Application = express()
@@ -9,7 +9,7 @@ app.use(express.json());
 
 
 
-app.post('/books', async (req: Request, res: Response) => {
+app.post('/books',  async (req: Request, res: Response)  => {
     console.log("post book")
     try {
         const book = new Book(req.body);
@@ -43,18 +43,16 @@ app.post('/books', async (req: Request, res: Response) => {
                 }
             });
         }
-
-        // fallback for other types of errors
         return res.status(400).json({
             success: false,
             message: "Book creation failed",
-            error: error instanceof Error ? error.message : error,
+            error: error instanceof Error ? error.message : error
         });
 
 
     }
 })
-app.get('/api/books', async (req: Request, res: Response) => {
+app.get('/books',  async (req: Request, res: Response)  => {
     try {
         const { filter, sortBy = 'createdAt', sort = 'desc', limit = '10' } = req.query;
 
@@ -85,7 +83,7 @@ app.get('/api/books', async (req: Request, res: Response) => {
 });
 
 
-app.get('/books/:id', async (req: Request, res: Response) => {
+app.get('/books/:id',  async (req: Request, res: Response)  => {
     const id = req.params.id;
     const book = await Book.findById({ _id: id })
     res.status(201).json({
@@ -95,7 +93,7 @@ app.get('/books/:id', async (req: Request, res: Response) => {
     });
 
 })
-app.put('/books/:id', async (req: Request, res: Response) => {
+app.put('/books/:id',  async (req: Request, res: Response)  => {
     const id = req.params.id;
     const updateData = req.body;
 
@@ -110,7 +108,7 @@ app.put('/books/:id', async (req: Request, res: Response) => {
     });
 })
 
-app.delete('/books/:id', async (req: Request, res: Response) => {
+app.delete('/books/:id',  async (req: Request, res: Response)  => {
     const id = req.params.id;
     const deletedBook = await Book.findByIdAndDelete(id)
     if (!deletedBook) {
@@ -126,32 +124,38 @@ app.delete('/books/:id', async (req: Request, res: Response) => {
     })
 })
 
-app.post('/borrow', async (req: Request, res: Response) => {
+app.post('/borrow',  async (req: Request, res: Response) => {
     const borrow = new Borrow(req.body)
     const { book, quantity, dueDate } = req.body;
     const books = await Book.findById(book)
+if (!books || typeof books.copies !== 'number') {
+  return res.status(400).json({
+    success: false,
+    message: 'Book not found or invalid copies value'
+  });
+}
 
-    if (books?.copies < quantity) {
+    if (books.copies < quantity) {
         res.status(400).json({
             success: false,
             message: "Not enough copies avaiable"
         })
     }
-    books?.copies -= quantity;
-    if (books?.copies === 0) {
+    books.copies -= quantity;
+    if (books.copies === 0) {
         books.available = false;
     }
-    await books?.save();
+    await books.save();
     await borrow.save();
 
     console.log(borrow)
     res.status(201).json({
         success: true,
         message: "Book borrowed successfully",
-        data: borrow,
+        data: borrow
     })
 })
-app.get('/borrow', async (req: Request, res: Response) => {
+app.get('/borrow',  async (req: Request, res: Response)  => {
     try {
         const borrow = await Borrow.aggregate([
             {
@@ -177,7 +181,7 @@ app.get('/borrow', async (req: Request, res: Response) => {
             }
         ]);
 
-        res.status(291).json({
+        res.status(201).json({
             success: true,
             message: "Borrowed books summary retrieved successfully",
             data: borrow
@@ -192,7 +196,7 @@ app.get('/borrow', async (req: Request, res: Response) => {
     }
 });
 
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (req, res) => {
     res.send('welcome to todo app')
 })
 export default app;
