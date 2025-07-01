@@ -37,7 +37,8 @@ const bookSchema = new Schema<books>({
 
 },
     {
-        timestamps: true
+        timestamps: true,
+        versionKey: false
     })
 
 export const Book = model("Book", bookSchema)

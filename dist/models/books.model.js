@@ -33,6 +33,7 @@ const bookSchema = new mongoose_1.Schema({
         default: true
     },
 }, {
-    timestamps: true
+    timestamps: true,
+    versionKey: false
 });
 exports.Book = (0, mongoose_1.model)("Book", bookSchema);

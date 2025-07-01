@@ -18,6 +18,7 @@ const borrorwSchema = new mongoose_1.Schema({
         required: true
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    versionKey: false
 });
 exports.Borrow = (0, mongoose_1.model)("Borrow", borrorwSchema);

@@ -1,6 +1,6 @@
 
 
-import express, { Application, Express, Request, Response} from 'express';
+import express, { Application, Express, Request, Response } from 'express';
 import { Book } from './models/books.model';
 import { Borrow } from './models/borrow.model';
 const app: Application = express()
@@ -9,7 +9,7 @@ app.use(express.json());
 
 
 
-app.post('/books',  async (req: Request, res: Response)  => {
+app.post('/api/books', async (req: Request, res: Response) => {
     console.log("post book")
     try {
         const book = new Book(req.body);
@@ -52,13 +52,23 @@ app.post('/books',  async (req: Request, res: Response)  => {
 
     }
 })
-app.get('/books',  async (req: Request, res: Response)  => {
+app.get('/api/books', async (req: Request, res: Response) => {
     try {
-        const { filter, sortBy = 'createdAt', sort = 'desc', limit = '10' } = req.query;
+        const { filter, sortBy, sort, limit } = req.query;
 
         const query: any = {};
         if (filter) {
-            query.genre = filter;
+            const numFilter = Number(filter);
+            const isNumber = !isNaN(numFilter);
+
+            query.$or = [
+                { genre: { $regex: filter, $options: "i" } },
+                { title: { $regex: filter, $options: "i" } },
+                { author: { $regex: filter, $options: "i" } },
+                { isbn: { $regex: filter, $options: "i" } },
+                { description: { $regex: filter, $options: "i" } },
+                ...(isNumber ? [{ copies: numFilter }] : [])
+            ];
         }
 
         const sortOptions: any = {};
@@ -83,7 +93,7 @@ app.get('/books',  async (req: Request, res: Response)  => {
 });
 
 
-app.get('/books/:id',  async (req: Request, res: Response)  => {
+app.get('/api/books/:id', async (req: Request, res: Response) => {
     const id = req.params.id;
     const book = await Book.findById({ _id: id })
     res.status(201).json({
@@ -93,10 +103,15 @@ app.get('/books/:id',  async (req: Request, res: Response)  => {
     });
 
 })
-app.put('/books/:id',  async (req: Request, res: Response)  => {
+app.put('/api/books/:id', async (req: Request, res: Response) => {
     const id = req.params.id;
     const updateData = req.body;
-
+    if (updateData.copies > 0) {
+        updateData.available = true;
+    }
+    if (updateData.copies === 0) {
+        updateData.available = false;
+    }
     const book = await Book.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true
@@ -104,11 +119,11 @@ app.put('/books/:id',  async (req: Request, res: Response)  => {
     res.status(201).json({
         success: true,
         message: "Book updated successfully",
-        data: book
+        data: updateData
     });
 })
 
-app.delete('/books/:id',  async (req: Request, res: Response)  => {
+app.delete('/api/books/:id', async (req: Request, res: Response) => {
     const id = req.params.id;
     const deletedBook = await Book.findByIdAndDelete(id)
     if (!deletedBook) {
@@ -124,16 +139,17 @@ app.delete('/books/:id',  async (req: Request, res: Response)  => {
     })
 })
 
-app.post('/borrow',  async (req: Request, res: Response) => {
+app.post('/api/borrow', async (req: Request, res: Response) => {
     const borrow = new Borrow(req.body)
+    console.log(req.body)
     const { book, quantity, dueDate } = req.body;
     const books = await Book.findById(book)
-if (!books || typeof books.copies !== 'number') {
-  return res.status(400).json({
-    success: false,
-    message: 'Book not found or invalid copies value'
-  });
-}
+    if (!books || typeof books.copies !== 'number') {
+        return res.status(400).json({
+            success: false,
+            message: 'Book not found or invalid copies value'
+        });
+    }
 
     if (books.copies < quantity) {
         res.status(400).json({
@@ -155,13 +171,21 @@ if (!books || typeof books.copies !== 'number') {
         data: borrow
     })
 })
-app.get('/borrow',  async (req: Request, res: Response)  => {
+app.get('/api/borrow', async (req: Request, res: Response) => {
     try {
         const borrow = await Borrow.aggregate([
             {
+                $group: {
+                    _id: "$book",
+                    quantity: { $sum: "$quantity" },
+                    dueDate: { $first: "$dueDate" }
+                }
+            }
+            ,
+            {
                 $lookup: {
                     from: "books",
-                    localField: "book",
+                    localField: "_id",
                     foreignField: "_id",
                     as: "bookInfo"
                 }

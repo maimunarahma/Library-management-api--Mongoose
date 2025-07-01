@@ -17,7 +17,7 @@ const books_model_1 = require("./models/books.model");
 const borrow_model_1 = require("./models/borrow.model");
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.post('/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/api/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     console.log("post book");
     try {
         const book = new books_model_1.Book(req.body);
@@ -55,12 +55,21 @@ app.post('/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         });
     }
 }));
-app.get('/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.get('/api/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { filter, sortBy = 'createdAt', sort = 'desc', limit = '10' } = req.query;
+        const { filter, sortBy, sort, limit } = req.query;
         const query = {};
         if (filter) {
-            query.genre = filter;
+            const numFilter = Number(filter);
+            const isNumber = !isNaN(numFilter);
+            query.$or = [
+                { genre: { $regex: filter, $options: "i" } },
+                { title: { $regex: filter, $options: "i" } },
+                { author: { $regex: filter, $options: "i" } },
+                { isbn: { $regex: filter, $options: "i" } },
+                { description: { $regex: filter, $options: "i" } },
+                ...(isNumber ? [{ copies: numFilter }] : [])
+            ];
         }
         const sortOptions = {};
         sortOptions[sortBy] = sort === 'desc' ? -1 : 1;
@@ -81,7 +90,7 @@ app.get('/books', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         });
     }
 }));
-app.get('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.get('/api/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = req.params.id;
     const book = yield books_model_1.Book.findById({ _id: id });
     res.status(201).json({
@@ -90,9 +99,15 @@ app.get('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* 
         data: book
     });
 }));
-app.put('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.put('/api/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = req.params.id;
     const updateData = req.body;
+    if (updateData.copies > 0) {
+        updateData.available = true;
+    }
+    if (updateData.copies === 0) {
+        updateData.available = false;
+    }
     const book = yield books_model_1.Book.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true
@@ -100,10 +115,10 @@ app.put('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* 
     res.status(201).json({
         success: true,
         message: "Book updated successfully",
-        data: book
+        data: updateData
     });
 }));
-app.delete('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.delete('/api/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = req.params.id;
     const deletedBook = yield books_model_1.Book.findByIdAndDelete(id);
     if (!deletedBook) {
@@ -118,8 +133,9 @@ app.delete('/books/:id', (req, res) => __awaiter(void 0, void 0, void 0, functio
         data: deletedBook,
     });
 }));
-app.post('/borrow', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/api/borrow', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const borrow = new borrow_model_1.Borrow(req.body);
+    console.log(req.body);
     const { book, quantity, dueDate } = req.body;
     const books = yield books_model_1.Book.findById(book);
     if (!books || typeof books.copies !== 'number') {
@@ -147,13 +163,20 @@ app.post('/borrow', (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         data: borrow
     });
 }));
-app.get('/borrow', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.get('/api/borrow', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const borrow = yield borrow_model_1.Borrow.aggregate([
             {
+                $group: {
+                    _id: "$book",
+                    quantity: { $sum: "$quantity" },
+                    dueDate: { $first: "$dueDate" }
+                }
+            },
+            {
                 $lookup: {
                     from: "books",
-                    localField: "book",
+                    localField: "_id",
                     foreignField: "_id",
                     as: "bookInfo"
                 }

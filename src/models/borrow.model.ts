@@ -20,7 +20,8 @@ const borrorwSchema= new Schema<borrow>({
       }
 },
 {
-    timestamps:true
+    timestamps:true,
+    versionKey:false
 })
 
 export const Borrow= model("Borrow", borrorwSchema)
